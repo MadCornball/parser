@@ -2,6 +2,7 @@ from fastapi import FastAPI, HTTPException
 from typing import List, Dict, Any
 import json
 import requests
+import os
 
 app = FastAPI()
 
@@ -15,6 +16,9 @@ HEADERS = {
 	"sec-ch-ua-platform": '"macOS"',
 	"Referer": "https://www.mcdonalds.com/ua/uk-ua/product/"
 }
+
+# Global variable to store menu items data
+menu_items_data = []
 
 
 def fetch_html(url: str) -> str:
@@ -108,26 +112,37 @@ def read_root():
 
 @app.get("/all_products/", response_model=List[Dict[str, Any]])
 async def get_all_products():
+	global menu_items_data  # Use the global variable
+	if menu_items_data:
+		return menu_items_data
+	
 	html = fetch_html(FULL_MENU_URL)
 	menu_items = parse_menu(html)
 	if menu_items:
-		with open(JSON_FILE_PATH, 'w', encoding='utf-8') as f:
-			json.dump(menu_items, f, ensure_ascii=False, indent=4)
+		menu_items_data = menu_items  # Store data in the global variable
 		
-		return menu_items
+		# Save to JSON file (optional)
+		with open(JSON_FILE_PATH, 'w', encoding='utf-8') as f:
+			json.dump(menu_items_data, f, ensure_ascii=False, indent=4)
+		
+		return menu_items_data
 	else:
 		raise HTTPException(status_code=500, detail="Failed to load menu items from the website.")
 
 
 @app.get("/products/{product_name}", response_model=Dict[str, Any])
 async def get_product(product_name: str):
-	with open(JSON_FILE_PATH, 'r', encoding='utf-8') as f:
-		menu_items = json.load(f)
+	global menu_items_data  # Use the global variable
+	if not menu_items_data:
+		# Load from JSON file if not loaded
+		if os.path.exists(JSON_FILE_PATH):
+			with open(JSON_FILE_PATH, 'r', encoding='utf-8') as f:
+				menu_items_data = json.load(f)
 	
 	# Normalize the product name for comparison
 	normalized_product_name = product_name.lower().strip()
 	
-	for item in menu_items:
+	for item in menu_items_data:
 		if item['name'].lower().strip() == normalized_product_name:
 			if 'id' in item:
 				product_details = await fetch_product_details_ajax(item['id'])
@@ -160,7 +175,6 @@ async def get_product_field(product_name: str, product_field: str):
 
 if __name__ == '__main__':
 	import uvicorn
-	import os
 	
 	# Check if the JSON file exists, if not create an empty list
 	if not os.path.exists(JSON_FILE_PATH):
