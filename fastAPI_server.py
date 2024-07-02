@@ -149,6 +149,15 @@ async def get_product(product_name: str):
 	raise HTTPException(status_code=404, detail=f"Product '{product_name}' not found.")
 
 
+@app.get("/products/{product_name}/{product_field}", response_model=Any)
+async def get_product_field(product_name: str, product_field: str):
+	product = await get_product(product_name)
+	if product_field in product:
+		return product[product_field]
+	else:
+		raise HTTPException(status_code=404, detail=f"Field '{product_field}' not found for product '{product_name}'.")
+
+
 if __name__ == '__main__':
 	import uvicorn
 	import os
