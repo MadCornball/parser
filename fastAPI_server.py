@@ -18,26 +18,7 @@ HEADERS = {
 }
 
 # Global variable to store menu items data
-menu_items_data = None
-
-
-# Function to load menu data from JSON file
-def load_menu_data():
-	global menu_items_data
-	if not menu_items_data:
-		if os.path.exists(JSON_FILE_PATH):
-			with open(JSON_FILE_PATH, 'r', encoding='utf-8') as f:
-				menu_items_data = json.load(f)
-		else:
-			menu_items_data = []
-
-
-# Function to save menu data to JSON file
-def save_menu_data():
-	global menu_items_data
-	if menu_items_data:
-		with open(JSON_FILE_PATH, 'w', encoding='utf-8') as f:
-			json.dump(menu_items_data, f, ensure_ascii=False, indent=4)
+menu_items_data = []
 
 
 def fetch_html(url: str) -> str:
@@ -131,8 +112,7 @@ def read_root():
 
 @app.get("/all_products/", response_model=List[Dict[str, Any]])
 async def get_all_products():
-	load_menu_data()  # Load menu data from file if not loaded
-	global menu_items_data
+	global menu_items_data  # Use the global variable
 	if menu_items_data:
 		return menu_items_data
 	
@@ -140,7 +120,11 @@ async def get_all_products():
 	menu_items = parse_menu(html)
 	if menu_items:
 		menu_items_data = menu_items  # Store data in the global variable
-		save_menu_data()  # Save to JSON file (optional)
+		
+		# Save to JSON file (optional)
+		with open(JSON_FILE_PATH, 'w', encoding='utf-8') as f:
+			json.dump(menu_items_data, f, ensure_ascii=False, indent=4)
+		
 		return menu_items_data
 	else:
 		raise HTTPException(status_code=500, detail="Failed to load menu items from the website.")
@@ -148,10 +132,12 @@ async def get_all_products():
 
 @app.get("/products/{product_name}", response_model=Dict[str, Any])
 async def get_product(product_name: str):
-	load_menu_data()  # Load menu data from file if not loaded
-	global menu_items_data
+	global menu_items_data  # Use the global variable
 	if not menu_items_data:
-		raise HTTPException(status_code=404, detail="Menu data not found.")
+		# Load from JSON file if not loaded
+		if os.path.exists(JSON_FILE_PATH):
+			with open(JSON_FILE_PATH, 'r', encoding='utf-8') as f:
+				menu_items_data = json.load(f)
 	
 	# Normalize the product name for comparison
 	normalized_product_name = product_name.lower().strip()
@@ -161,10 +147,17 @@ async def get_product(product_name: str):
 			if 'id' in item:
 				product_details = await fetch_product_details_ajax(item['id'])
 				
-				# Update menu_items_data with product details
-				item.update(product_details)
-				save_menu_data()  # Save updated data to JSON file
-				return item
+				# Update JSON file with product details
+				product_details_list = []
+				if os.path.exists(JSON_FILE_PATH):
+					with open(JSON_FILE_PATH, 'r', encoding='utf-8') as f:
+						product_details_list = json.load(f)
+				
+				product_details_list.append(product_details)
+				with open(JSON_FILE_PATH, 'w', encoding='utf-8') as f:
+					json.dump(product_details_list, f, ensure_ascii=False, indent=4)
+				
+				return product_details
 			else:
 				raise HTTPException(status_code=404, detail=f"Product ID not found for '{product_name}'.")
 	
