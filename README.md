@@ -6,7 +6,7 @@ This project is a FastAPI application that collects and retrieves information ab
 
 1. Clone the repository:
     ```sh
-    git clone https://github.com/your-username/parser.git
+    git clone https://github.com/MadCornball/parser.git
     cd parser
     ```
 
